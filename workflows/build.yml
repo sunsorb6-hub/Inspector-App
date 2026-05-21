@@ -1,0 +1,53 @@
+name: Build and Release Inspector
+
+on:
+  push:
+    tags:
+      - 'v*' # Le script se déclenchera dès que tu pousseras un tag de version (ex: v4.3)
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write # Donne l'autorisation à l'action de créer la Release et d'y déposer le fichier
+
+    steps:
+    - name: Récupération du code source
+      uses: actions/checkout@v4
+
+    - name: Installation de Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+        cache: 'pip'
+
+    - name: Installation des dépendances et de PyInstaller
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller
+        if (Test-Path requirements.txt) { pip install -r requirements.txt }
+
+    - name: Compilation avec PyInstaller
+      run: |
+        # --onefile : Un seul fichier .exe autonome
+        # --name : Renomme le fichier final en Inspector.exe
+        # --uac-admin : Demande automatiquement l'élévation d'administration au lancement sous Windows
+        pyinstaller --onefile --name="Inspector" --uac-admin main.py
+
+    - name: Publication de la Release GitHub
+      uses: softprops/action-gh-release@v2
+      with:
+        files: dist/Inspector.exe
+        name: Inspector ${{ github.ref_name }}
+        body: |
+          Version officielle automatisée de l'Inspecteur Système.
+          
+          ### Fonctionnalités :
+          - Exécutable tout-en-un portable sous Windows.
+          - Élévation de privilèges (UAC) native requise.
+          - Diagnostic complet (OS, CPU, GPU, RAM, Disques et Réseau).
+          - Outils intégrés de nettoyage de caches et d'optimisation.
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Clé d'authentification native fournie par GitHub
