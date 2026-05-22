@@ -6,30 +6,30 @@ import os
 import subprocess
 import shutil
 import ctypes
-import socket
+import socket  # Fiabilise la détection des adresses IP (IPv4 / IPv6)
 from io import StringIO
 from datetime import datetime
 
 def is_admin():
-    """Check if the script is running with Administrator rights"""
+    """Vérifie si le script est exécuté avec les droits Administrateur"""
     try:
         return ctypes.windll.shell32.IsUserAnAdmin()
     except Exception:
         return False
 
 def require_admin():
-    """Force the script to restart in Administrator mode if necessary"""
+    """Force la relance du script en mode Administrateur si nécessaire"""
     if platform.system() != "Windows":
         return True
         
     if not is_admin():
-        print("[Info] Administrator rights required. Attempting to restart...")
+        print("[Info] Droits administrateur requis. Tentative de relance...")
         ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
         sys.exit()
     return True
 
-def get_size(bytes, suffix="B"):
-    """Convert bytes to readable format (KB, MB, GB, etc.)"""
+def get_size(bytes, suffix="o"):
+    """Convertit les octets en format lisible (Ko, Mo, Go, etc.)"""
     factor = 1024
     for unit in ["", "K", "M", "G", "T", "P"]:
         if bytes < factor:
@@ -38,35 +38,35 @@ def get_size(bytes, suffix="B"):
 
 def get_os_info():
     out = StringIO()
-    print("--- OPERATING SYSTEM ---", file=out)
-    print(f"System    : {platform.system()}", file=out)
+    print("--- SYSTÈME D'EXPLOITATION ---", file=out)
+    print(f"Système   : {platform.system()}", file=out)
     print(f"Version   : {platform.version()}", file=out)
-    print(f"Release   : {platform.release()}", file=out)
+    print(f"Édition   : {platform.release()}", file=out)
     print(f"Machine   : {platform.machine()}", file=out)
-    print(f"PC Name   : {platform.node()}", file=out)
+    print(f"Nom du PC : {platform.node()}", file=out)
     return out.getvalue()
 
 def get_cpu_info():
     out = StringIO()
-    print("--- PROCESSOR (CPU) ---", file=out)
-    print(f"Model          : {platform.processor()}", file=out)
-    print(f"Physical Cores : {psutil.cpu_count(logical=False)}", file=out)
-    print(f"Logical Cores  : {psutil.cpu_count(logical=True)}", file=out)
+    print("--- PROCESSEUR (CPU) ---", file=out)
+    print(f"Modèle         : {platform.processor()}", file=out)
+    print(f"Cœurs Physiques: {psutil.cpu_count(logical=False)}", file=out)
+    print(f"Cœurs Logiques : {psutil.cpu_count(logical=True)}", file=out)
     
     try:
         cpufreq = psutil.cpu_freq()
         if cpufreq:
-            print(f"Max Frequency  : {cpufreq.max:.2f} Mhz", file=out)
-            print(f"Min Frequency  : {cpufreq.min:.2f} Mhz", file=out)
-            print(f"Current Freq.  : {cpufreq.current:.2f} Mhz", file=out)
+            print(f"Fréquence Max  : {cpufreq.max:.2f} Mhz", file=out)
+            print(f"Fréquence Min  : {cpufreq.min:.2f} Mhz", file=out)
+            print(f"Fréquence Act. : {cpufreq.current:.2f} Mhz", file=out)
     except Exception:
         pass
-    print(f"Utilization    : {psutil.cpu_percent(interval=0.1)}%", file=out)
+    print(f"Utilisation    : {psutil.cpu_percent(interval=0.1)}%", file=out)
     return out.getvalue()
 
 def get_gpu_info():
     out = StringIO()
-    print("--- GRAPHICS CARD (GPU) ---", file=out)
+    print("--- CARTE GRAPHIQUE (GPU) ---", file=out)
     sys_type = platform.system()
     
     if sys_type == "Windows":
@@ -82,106 +82,108 @@ def get_gpu_info():
                 if len(parts) >= 3:
                     gpu_count += 1
                     print(f"GPU #{gpu_count} : {parts[2]}", file=out)
-                    print(f"  Driver   : {parts[1]}", file=out)
+                    print(f"  Pilote   : {parts[1]}", file=out)
             if gpu_count == 0:
-                print("No GPU detected.", file=out)
+                print("Aucun GPU détecté.", file=out)
         except Exception:
-            print("Unable to retrieve GPU details via WMIC.", file=out)
+            print("Impossible de récupérer les détails du GPU via WMIC.", file=out)
     elif sys_type == "Linux":
         try:
             output = subprocess.check_output("lspci | grep -i vga", shell=True).decode('utf-8')
-            print(f"Hardware: {output.strip()}", file=out)
+            print(f"Matériel : {output.strip()}", file=out)
         except Exception:
-            print("The lspci tool is not available.", file=out)
+            print("L'outil lspci n'est pas disponible.", file=out)
     elif sys_type == "Darwin":
         try:
             cmd = "system_profiler SPDisplaysDataType | grep 'Chipset Model'"
             output = subprocess.check_output(cmd, shell=True).decode('utf-8')
             print(f"{output.strip()}", file=out)
         except Exception:
-            print("Unable to retrieve GPU details on macOS.", file=out)
+            print("Impossible de récupérer les détails du GPU sur macOS.", file=out)
     return out.getvalue()
 
 def get_ram_info():
     out = StringIO()
-    print("--- MEMORY (RAM) ---", file=out)
+    print("--- MÉMOIRE (RAM) ---", file=out)
     svmem = psutil.virtual_memory()
-    print(f"Total       : {get_size(svmem.total)}", file=out)
-    print(f"Available   : {get_size(svmem.available)}", file=out)
-    print(f"Used        : {get_size(svmem.used)}", file=out)
-    print(f"Percentage  : {svmem.percent}%", file=out)
+    print(f"Totale      : {get_size(svmem.total)}", file=out)
+    print(f"Disponible  : {get_size(svmem.available)}", file=out)
+    print(f"Utilisée    : {get_size(svmem.used)}", file=out)
+    print(f"Pourcentage : {svmem.percent}%", file=out)
     return out.getvalue()
 
 def get_disk_info():
     out = StringIO()
-    print("--- DISKS ---", file=out)
+    print("--- DISQUES ---", file=out)
     try:
         partitions = psutil.disk_partitions()
         for partition in partitions:
-            print(f"\nDrive: {partition.device}", file=out)
-            print(f"  Mount point  : {partition.mountpoint}", file=out)
-            print(f"  File system  : {partition.fstype}", file=out)
+            print(f"\nLecteur : {partition.device}", file=out)
+            print(f"  Point de montage : {partition.mountpoint}", file=out)
+            print(f"  Système de fich. : {partition.fstype}", file=out)
             try:
                 partition_usage = psutil.disk_usage(partition.mountpoint)
-                print(f"  Total Space  : {get_size(partition_usage.total)}", file=out)
-                print(f"  Used Space   : {get_size(partition_usage.used)}", file=out)
-                print(f"  Free Space   : {get_size(partition_usage.free)}", file=out)
-                print(f"  Percentage   : {partition_usage.percent}%", file=out)
+                print(f"  Espace Total     : {get_size(partition_usage.total)}", file=out)
+                print(f"  Espace Utilisé   : {get_size(partition_usage.used)}", file=out)
+                print(f"  Espace Libre     : {get_size(partition_usage.free)}", file=out)
+                print(f"  Pourcentage      : {partition_usage.percent}%", file=out)
             except PermissionError:
-                print("  Access denied for this drive.", file=out)
+                print("  Accès refusé pour ce lecteur.", file=out)
     except Exception as e:
-        print(f"Error reading partitions: {e}", file=out)
+        print(f"Erreur lors de la lecture des partitions : {e}", file=out)
     return out.getvalue()
 
 def get_net_info():
     out = StringIO()
-    print("--- NETWORK ---", file=out)
+    print("--- RÉSEAU ---", file=out)
     try:
         if_addrs = psutil.net_if_addrs()
         for interface_name, interface_addresses in if_addrs.items():
-            print(f"\nInterface: {interface_name}", file=out)
+            print(f"\nInterface : {interface_name}", file=out)
             for address in interface_addresses:
+                # Utilisation de socket.AF_INET pour l'IPv4 de manière universelle
                 if address.family == socket.AF_INET:
-                    print(f"  [IPv4] IP Address : {address.address}", file=out)
-                    print(f"         Netmask    : {address.netmask}", file=out)
+                    print(f"  [IPv4] Adresse IP : {address.address}", file=out)
+                    print(f"         Masque     : {address.netmask}", file=out)
                     if address.broadcast:
                         print(f"         Broadcast  : {address.broadcast}", file=out)
+                # Optionnel : détection IPv6
                 elif address.family == getattr(socket, 'AF_INET6', None):
-                    print(f"  [IPv6] IP Address : {address.address}", file=out)
+                    print(f"  [IPv6] Adresse IP : {address.address}", file=out)
     except Exception as e:
-        print(f"Unable to retrieve network information: {e}", file=out)
+        print(f"Impossible de récupérer les informations réseau : {e}", file=out)
     return out.getvalue()
 
 def inspect_drive(drive_letter):
-    print(f"\n--- DRIVE INSPECTION {drive_letter.upper()} ---")
+    print(f"\n--- INSPECTION DU LECTEUR {drive_letter.upper()} ---")
     drive_letter = drive_letter.upper().rstrip('\\')
     if not drive_letter.endswith(':'):
         drive_letter += ':'
     try:
         usage = psutil.disk_usage(drive_letter + '\\')
-        print(f"Status          : Accessible")
-        print(f"Total Space     : {get_size(usage.total)}")
-        print(f"Used Space      : {get_size(usage.used)} ({usage.percent}%)")
-        print(f"Free Space      : {get_size(usage.free)}")
+        print(f"Statut             : Accessible")
+        print(f"Espace Total       : {get_size(usage.total)}")
+        print(f"Espace Utilisé     : {get_size(usage.used)} ({usage.percent}%)")
+        print(f"Espace Libre       : {get_size(usage.free)}")
         if platform.system() == "Windows":
             clean_letter = drive_letter.replace(':', '')
             cmd = f'powershell "Get-PhysicalDisk | Where-Object {{$_.DeviceID -eq (Get-Partition -DriveLetter {clean_letter}).DiskNumber}} | Select-Object -ExpandProperty MediaType"'
             media_type = subprocess.check_output(cmd, shell=True).decode('utf-8').strip()
             if media_type:
-                print(f"Storage type    : {media_type}")
+                print(f"Type de stockage   : {media_type}")
     except Exception as e:
-        print(f"Inspection error: {e}")
+        print(f"Erreur d'inspection : {e}")
 
 def inspect_process(target):
-    print(f"\n--- PROCESS SEARCH: {target} ---")
+    print(f"\n--- RECHERCHE DU PROCESSUS : {target} ---")
     if target.isdigit():
         try:
             p = psutil.Process(int(target))
-            print(f"Name: {p.name()} | PID: {p.pid} | Status: {p.status()}")
-            print(f"RAM: {get_size(p.memory_info().rss)} | CPU: {p.cpu_percent(interval=0.1)}%")
+            print(f"Nom : {p.name()} | PID : {p.pid} | Statut : {p.status()}")
+            print(f"RAM : {get_size(p.memory_info().rss)} | CPU : {p.cpu_percent(interval=0.1)}%")
             return
         except psutil.NoSuchProcess:
-            print("PID not found.")
+            print("PID introuvable.")
             return
 
     matching_processes = []
@@ -196,19 +198,19 @@ def inspect_process(target):
             continue
 
     if not matching_processes:
-        print("No process found.")
+        print("Aucun processus trouvé.")
         return
-    print(f"Instances: {len(matching_processes)} | Total RAM: {get_size(total_memory)}")
+    print(f"Instances : {len(matching_processes)} | RAM totale : {get_size(total_memory)}")
 
 def clean_system():
     if platform.system() != "Windows":
-        print("Cleanup function is optimized only for Windows.")
+        print("La fonction de nettoyage est optimisée uniquement pour Windows.")
         return
 
-    print("\n--- TEMPORARY FOLDERS (CLEANUP) ---")
-    confirm = input("Do you want to start cleaning temporary files? (y/n): ").strip().lower()
-    if confirm != 'y':
-        print("Cleanup cancelled.")
+    print("\n--- DOSSIERS TEMPORAIRES (NETTOYAGE) ---")
+    confirm = input("Voulez-vous lancer le nettoyage des fichiers temporaires ? (o/n) : ").strip().lower()
+    if confirm != 'o':
+        print("Nettoyage annulé.")
         return
 
     require_admin()
@@ -224,7 +226,7 @@ def clean_system():
     for path in paths_to_clean:
         if not path or not os.path.exists(path):
             continue
-        print(f"\nCleaning: {path}")
+        print(f"\nNettoyage de : {path}")
         for item in os.listdir(path):
             item_path = os.path.join(path, item)
             try:
@@ -243,20 +245,20 @@ def clean_system():
             except Exception:
                 continue
 
-    print(f"\n[Success] Cleanup finished.")
-    print(f"-> Items deleted: {files_deleted}")
-    print(f"-> Disk space recovered: {get_size(bytes_saved)}")
+    print(f"\n[Succès] Nettoyage terminé.")
+    print(f"-> Éléments supprimés : {files_deleted}")
+    print(f"-> Espace disque récupéré : {get_size(bytes_saved)}")
 
 def optimize_system():
     if platform.system() != "Windows":
-        print("Process optimization is designed for Windows.")
+        print("L'optimisation des processus est conçue pour Windows.")
         return
 
-    print("\n--- PROCESS OPTIMIZATION ---")
-    print("This command will close unnecessary telemetry, error reporting, and tracking services.")
-    confirm = input("Do you want to continue? (y/n): ").strip().lower()
-    if confirm != 'y':
-        print("Optimization cancelled.")
+    print("\n--- OPTIMISATION DES PROCESSUS ---")
+    print("Cette commande va fermer les services de télémétrie, de rapports d'erreurs et de tracking superflus.")
+    confirm = input("Voulez-vous continuer ? (o/n) : ").strip().lower()
+    if confirm != 'o':
+        print("Optimisation annulée.")
         return
 
     require_admin()
@@ -276,65 +278,66 @@ def optimize_system():
                 ram_freed += proc.info['memory_info'].rss if proc.info['memory_info'] else 0
                 proc.kill()
                 killed_count += 1
-                print(f"  [X] Target identified and closed: {p_name} (PID: {proc.info['pid']})")
+                print(f"  [X] Tuable identifié et fermé : {p_name} (PID: {proc.info['pid']})")
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
 
     if killed_count == 0:
-        print("\nNo unnecessary processes detected or active right now. Your system is already clean!")
+        print("\nAucun processus superflu détecté ou actif en ce moment. Votre système est déjà propre !")
     else:
-        print(f"\n[Success] Optimization finished.")
-        print(f"-> Processes stopped: {killed_count}")
-        print(f"-> RAM immediately freed: {get_size(ram_freed)}")
+        print(f"\n[Succès] Optimisation terminée.")
+        print(f"-> Processus arrêtés : {killed_count}")
+        print(f"-> Mémoire vive immédiatement libérée : {get_size(ram_freed)}")
 
 def export_report():
-    folder_name = "Reports"
+    folder_name = "Rapports"
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
         
     now = datetime.now()
-    date_texte = now.strftime("%Y-%m-%d at %H:%M:%S")
-    filename = now.strftime("%Y-%m-%d_%Hh%Mm%Ss.txt")
+    date_texte = now.strftime("%d/%m/%Y à %H:%M:%S")
+    filename = now.strftime("%d-%m-%Y_%HHh%Mm%SSs.txt")
     filepath = os.path.join(folder_name, filename)
     
     try:
         with open(filepath, "w", encoding="utf-8") as f:
             f.write("=========================================\n")
-            f.write("      HARDWARE AND SYSTEM REPORT         \n")
-            f.write(f"      Generated on: {date_texte}     \n")
+            f.write("      RAPPORT MATÉRIEL ET SYSTÈME        \n")
+            f.write(f"      Généré le : {date_texte}       \n")
             f.write("=========================================\n\n")
+            # Injection de TOUS les modules sans aucune omission
             f.write(get_os_info() + "\n")
             f.write(get_cpu_info() + "\n")
             f.write(get_gpu_info() + "\n")
             f.write(get_ram_info() + "\n")
             f.write(get_disk_info() + "\n")
             f.write(get_net_info() + "\n")
-        print(f"\n[Success] Complete report saved in: {os.path.abspath(filepath)}")
+        print(f"\n[Succès] Rapport complet sauvegardé dans : {os.path.abspath(filepath)}")
     except Exception as e:
-        print(f"\n[Error] Export failed: {e}")
+        print(f"\n[Erreur] Échec de l'export : {e}")
 
 def show_help():
-    print("\nAvailable commands:")
-    print("  os      : Operating system information")
-    print("  cpu     : Complete processor details (Frequencies & cores)")
-    print("  gpu     : Graphics card models and driver versions")
-    print("  ram     : Memory status, sizes, and usage")
-    print("  disk    : Comprehensive list of partitions (Mount points & types)")
-    print("  inspect : Deep inspect a target drive (e.g., C:)")
-    print("  proc    : Analyze a process/software by NAME or PID")
-    print("  clean   : [ADMIN] Clean temporary files and caches")
-    print("  optimize: [ADMIN] Close unnecessary background processes")
-    print("  net     : Network adapters, subnet masks, and active IPs")
-    print("  all     : Display all modules on screen")
-    print("  export  : Create a dated global report in the 'Reports' folder")
-    print("  clear   : Clear the console screen")
-    print("  help    : Display this help menu")
-    print("  exit    : Close the program\n")
+    print("\nCommandes disponibles :")
+    print("  os      : Informations du système d'exploitation")
+    print("  cpu     : Détails complets du processeur (Fréquences & cœurs)")
+    print("  gpu     : Modèles de puces graphiques et versions de pilotes")
+    print("  ram     : État, tailles et occupation de la mémoire vive")
+    print("  disk    : Liste exhaustive des partitions (Points de montage & types)")
+    print("  inspect : Inspecte un lecteur cible en profondeur (ex: C:)")
+    print("  proc    : Analyse un processus/logiciel par NOM ou PID")
+    print("  clean   : [ADMIN] Nettoie les fichiers et caches temporaires")
+    print("  optimize: [ADMIN] Ferme les processus d'arrière-plan superflus")
+    print("  net     : Cartes réseaux, masques de sous-réseau et IPs actives")
+    print("  all     : Affiche l'ensemble complet des modules à l'écran")
+    print("  export  : Crée un rapport global daté dans le dossier 'Rapports'")
+    print("  clear   : Nettoie l'écran de la console")
+    print("  help    : Affiche ce menu d'aide")
+    print("  exit    : Ferme le programme\n")
 
 def main():
-    status = " (Administrator Mode)" if is_admin() else ""
-    print(f"System Monitor & Inspector v4.3{status}")
-    print("Enter 'help' to start.")
+    status = " (Mode Administrateur)" if is_admin() else ""
+    print(f"Moniteur & Inspecteur Système v4.3{status}")
+    print("Entrez 'help' pour démarrer.")
     
     while True:
         try:
@@ -357,11 +360,11 @@ def main():
             elif choix == 'optimize':
                 optimize_system()
             elif choix == 'inspect':
-                cible = input("Letter of the drive to inspect (e.g., C): ").strip()
+                cible = input("Lettre du lecteur à inspecter (ex: C) : ").strip()
                 if cible:
                     inspect_drive(cible)
             elif choix == 'proc':
-                cible = input("Name of the program or PID to analyze: ").strip().lower()
+                cible = input("Nom du programme ou PID à analyser : ").strip().lower()
                 if cible:
                     inspect_process(cible)
             elif choix == 'net':
@@ -373,15 +376,15 @@ def main():
             elif choix == 'clear':
                 os.system('cls' if os.name == 'nt' else 'clear')
             elif choix in ['exit', 'quit']:
-                print("Closing application.")
+                print("Fermeture de l'application.")
                 break
             elif choix == "":
                 continue
             else:
-                print("Unknown command. Use 'help'.")
+                print("Commande inconnue. Utilisez 'help'.")
                 
         except KeyboardInterrupt:
-            print("\nExiting program.")
+            print("\nSortie du programme.")
             break
 
 if __name__ == "__main__":
