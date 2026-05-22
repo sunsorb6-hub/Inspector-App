@@ -3,7 +3,7 @@ name: Build Inspector Portable
 on:
   push:
     branches:
-      - main # S'active automatiquement à chaque changement poussé sur la branche main
+      - main
 
 jobs:
   build-windows:
@@ -25,7 +25,9 @@ jobs:
 
     - name: Compilation en Exécutable
       run: |
-        pyinstaller --onefile --name="Inspector" --uac-admin main.py
+        # --icon="ico.ico" applique l'icône présente à côté de main.py
+        # Le retrait de --uac-admin permet de lancer l'application sans privilèges initiaux
+        pyinstaller --onefile --name="Inspector" --icon="ico.ico" main.py
 
     - name: Téléverser l'exécutable sur GitHub
       uses: actions/upload-artifact@v4
